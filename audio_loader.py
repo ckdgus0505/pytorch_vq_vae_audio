@@ -7,7 +7,6 @@ import librosa
 import numpy as np
 
 # a repo with fast generation algorithm: https://github.com/vincentherrmann/pytorch-wavenet
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 class VCTK(data.Dataset):
     def __init__(self,
                  root,
@@ -48,17 +47,18 @@ class VCTK(data.Dataset):
             self.cached_pt = int(index // self.chunk_size)
             self.audios = torch.load(os.path.join(
                 self.root, self.processed_folder, "vctk_{:04d}.pt".format(self.cached_pt)))
-        index = index % self.chunk_size
-        audio, speaker_id = self.audios[index]
         
-        #select random segment
-        if audio.shape[0] >= self.segment_length:
-            max_audio_start = audio.shape[0] - self.segment_length
-            audio_start = random.randint(0, max_audio_start)
-            audio = audio[audio_start:audio_start+self.segment_length]
-        else:
-            print("Very short audio {}".format(speaker_id))
-            audio = torch.nn.functional.pad(audio, (0, self.segment_length - audio.size(0)), 'constant').data
+        index = index % self.chunk_size
+        audio, speaker_id = self.audios[index]        
+        while audio.shape[0] < self.segment_length:
+            index += 1
+            index = index % self.chunk_size
+            audio, speaker_id = self.audios[index]
+         #select random segment
+
+        max_audio_start = audio.shape[0] - self.segment_length
+        audio_start = random.randint(0, max_audio_start)
+        audio = audio[audio_start:audio_start+self.segment_length]
         
         #divide into input and target
         audio = torch.from_numpy(audio)
