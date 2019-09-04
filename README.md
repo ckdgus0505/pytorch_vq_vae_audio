@@ -1,6 +1,6 @@
 # pytorch-vq-vae
-PyTorch implementation of VQ-VAE by Aäron van den Oord et al.
-
+My attempt at PyTorch implementation of VQ-VAE paper by Aäron van den Oord et al.
+for audio
 ## Requirements
 
 ```
