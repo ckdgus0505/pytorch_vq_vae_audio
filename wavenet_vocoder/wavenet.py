@@ -78,7 +78,7 @@ class WaveNet(nn.Module):
           directly.
     """
 
-    def __init__(self, out_channels=256, layers=20, stacks=2,
+    def __init__(self, device,out_channels=256, layers=20, stacks=2,
                  residual_channels=512,
                  gate_channels=512,
                  skip_out_channels=512,
@@ -131,22 +131,32 @@ class WaveNet(nn.Module):
         # Upsample conv net
         # we use transposed encoder net 
         if upsample_conditional_features:
-            self.upsample_conv = nn.ModuleList()
-            in_channels = decoding_channels[0]
-            for i, out_channels in enumerate(decoding_channels[1:]):
-                convt = nn.ConvTranspose1d(in_channels, 
-                                           out_channels, 
-                                           kernel_size=4,
-                                           stride=2)
-                in_channels = out_channels
-                self.upsample_conv.append(convt)
-                self.upsample_conv.append(nn.ReLU())
-            out_channels = 1
-            convt = nn.ConvTranspose1d(in_channels, 
-                                        out_channels, 
-                                       kernel_size=4,
-                                       stride=2)
-            self.upsample_conv.append(convt)
+#             self.upsample_conv = nn.ModuleList()
+#             in_channels = decoding_channels[0]
+#             for i, out_channels in enumerate(decoding_channels[1:]):
+#                 convt = nn.ConvTranspose1d(in_channels, 
+#                                            out_channels, 
+#                                            kernel_size=4,
+#                                            stride=2)
+#                 in_channels = out_channels
+#                 self.upsample_conv.append(convt)
+#                 self.upsample_conv.append(nn.ReLU())
+#             out_channels = 1
+#             convt = nn.ConvTranspose1d(in_channels, 
+#                                         out_channels, 
+#                                        kernel_size=4,
+#                                        stride=2)
+#             self.upsample_conv.append(convt)
+            
+# TO DO: alternatively, let us simply tile up because it worked for jeremy https://github.com/JeremyCCHsu/vqvae-speech/blob/master/models/vqvae.py#L321
+            def f(t):
+                batch_size = t.shape[0]
+                t = t.repeat(1,1,64)\
+                      .reshape(batch_size, cin_channels, 64,-1)\
+                      .transpose(3,2)\
+                      .reshape(batch_size, cin_channels, -1)
+                return torch.cat([torch.zeros(batch_size, cin_channels, 126, device=device),t], dim=2)
+            self.upsample_conv = [f]
         else:
             self.upsample_conv = None
 
@@ -163,7 +173,7 @@ class WaveNet(nn.Module):
         Args:
             x (Tensor): One-hot encoded audio signal, shape (B x C x T)
             c (Tensor): Local conditioning features,
-              shape (B x cin_channels x T)
+              shape (B x cin_channels x T) (or B x cin_channels x t, to be upsampled)
             g (Tensor): Global conditioning features,
               shape (B x gin_channels x 1) or speaker Ids of shape (B x 1).
               Note that ``self.use_speaker_embedding`` must be False when you
@@ -190,8 +200,9 @@ class WaveNet(nn.Module):
         if c is not None and self.upsample_conv is not None:
             for f in self.upsample_conv:
                 c = f(c)
-            assert c.size(-1) == x.size(-1)
-            
+            assert c.size(-1) == x.size(-1), (c.shape, x.shape)
+#        print("c.shape", c.shape)
+#        print("x.shape", x.shape)
         # Feed data to network
         x = self.first_conv(x)
         skips = None
@@ -272,7 +283,7 @@ class WaveNet(nn.Module):
         outputs = []
         if initial_input is None:
             initial_input = torch.zeros(B, 1, self.out_channels)
-            initial_input[:, :, 127] = 1  # TODO: is this ok?
+            initial_input[:, :, 127] = 1 
             # https://github.com/pytorch/pytorch/issues/584#issuecomment-275169567
             if next(self.parameters()).is_cuda:
                 initial_input = initial_input.cuda()
