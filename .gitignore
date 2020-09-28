@@ -1,8 +1,10 @@
 *.npy
 *.wav
+*.py
 model_epoch*
 optim_epoch*
-
+vq-vae-graph_analysis-None_EMA.ipynb
+vq-vae-Generate.ipynb
 
 
 # Created by https://www.toptal.com/developers/gitignore/api/python,jupyternotebooks,linux
